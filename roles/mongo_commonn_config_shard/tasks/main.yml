@@ -1,0 +1,46 @@
+- name: Create a ext4 filesystem on /dev/xvdb
+  filesystem: fstype=ext4 dev=/dev/xvdb
+- name: Create a ext4 filesystem on /dev/xvdc
+  filesystem: fstype=ext4 dev=/dev/xvdc
+- name: Create a ext4 filesystem on /dev/xvdd
+  filesystem: fstype=ext4 dev=/dev/xvdd
+- name: Mount data
+  mount:
+    name: /data
+    src: /dev/xvdb
+    fstype: ext4
+    state: mounted
+- name: Mount logs
+  mount:
+    name: /logs
+    src: /dev/xvdc
+    fstype: ext4
+    state: mounted
+- name: Mount journal
+  mount:
+    name: /journal
+    src: /dev/xvdd
+    fstype: ext4
+    state: mounted
+- name: Change owner to mongodb
+  file: path={{ item.path }} state=directory owner=mongod group=mongod
+  with_items:
+    - { path: '/data' }
+    - { path: '/logs' }
+    - { path: '/journal' }
+- name: Make symlink to journal
+  file: src=/journal dest=/data/journal state=link owner=mongod group=mongod
+- name: Correct ulimits limits.conf
+  lineinfile: dest=/etc/security/limits.conf line='{{ item.line }}'
+  with_items:
+    - { line: '* soft nofile 64000' }
+    - { line: '* hard nofile 64000' }
+    - { line: '* soft nproc 32000' }
+    - { line: '* hard nproc 32000' }
+- name: Correct ulimits 90-nproc.conf
+  lineinfile: dest=/etc/security/limits.d/90-nproc.conf line='{{ item.line }}' create=yes
+  with_items:
+    - { line: '* soft nproc 32000' }
+    - { line: '* hard nproc 32000' }
+- name: Correct /etc/udev/rules.d/85-ebs.rules
+  lineinfile: dest=/etc/udev/rules.d/85-ebs.rules create=yes line='ACTION=="add", KERNEL=="xvdb", ATTR{bdi/read_ahead_kb}="16"'

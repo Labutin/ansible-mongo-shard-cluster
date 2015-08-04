@@ -1,0 +1,4 @@
+- name: Copy MongoDB config
+  copy: src=mongod.conf dest=/etc/mongod.conf
+- name: restart server
+  command: /sbin/reboot

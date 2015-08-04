@@ -1,0 +1,6 @@
+- name: Update all packages to latest
+  yum: name=* state=latest
+- name: Install common packages
+  yum: name=mc,ntp state=latest
+- name: Start ntpd
+  service: name=ntpd state=started enabled=yes

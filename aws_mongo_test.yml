@@ -1,0 +1,228 @@
+---
+- name: Mongo test environment
+  hosts: localhost
+  gather_facts: False
+  tasks:
+  - name: Create Mongo VPC
+    ec2_vpc:
+      state: present
+      cidr_block: 10.0.0.0/16
+      region: us-west-2
+      resource_tags: {"t": "v"}
+      subnets:
+        - cidr: 10.0.0.0/16
+          az: us-west-2a
+          resource_tags: {"t": "v"}
+      internet_gateway: True
+      route_tables:
+        - subnets:
+          - 10.0.0.0/16
+          routes:
+            - dest: 0.0.0.0/0
+              gw: igw
+      wait: yes
+    register: ec2_vpc1
+  - name: Create security group
+    ec2_group:
+      description: SSH access
+      name: SSH_access
+      region: us-west-2
+      state: present
+      vpc_id: "{{ ec2_vpc1.vpc_id }}"
+      rules:
+        - proto: tcp
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+    register: ec2_group
+  - name: Create EC2 instances for MongoShards
+    ec2:
+      key_name: mongo
+      # instance_type: t2.micro
+      instance_type: c4.xlarge
+      image: ami-e7527ed7
+      region: us-west-2
+      wait: yes
+      group: ['SSH_access','default']
+      instance_tags:
+        MongoShard: True
+      exact_count: 3
+      count_tag: MongoShard
+      vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
+      assign_public_ip: yes
+      placement_group: mongo
+      volumes:
+        - device_name: /dev/xvdb
+          device_type: io1
+          iops: 2000
+          volume_size: 70
+          delete_on_termination: true
+        - device_name: /dev/xvdc
+          device_type: gp2
+          # iops: 1000
+          volume_size: 10
+          delete_on_termination: true
+        - device_name: /dev/xvdd
+          device_type: io1
+          iops: 1000
+          volume_size: 40
+          delete_on_termination: true
+      wait: yes
+      ebs_optimized: yes
+    register: ec2_shards
+  - name: Add new instance to host group
+    add_host: hostname={{ item.public_ip }} groupname=mongo_shards ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
+    with_items: ec2_shards.instances
+  - name: Wait for SSH to come up
+    wait_for: host={{ item.public_dns_name }} port=22 delay=5 timeout=320 state=started
+    with_items: ec2_shards.instances
+  - name: Get rid of SSH "Are you sure you want to continue connecting (yes/no)?" query
+    local_action: command sh -c 'ssh-keyscan -t ECDSA {{ item.public_ip }} >> $HOME/.ssh/known_hosts'
+    with_items: ec2_shards.instances
+  - name: Empty shardNodes
+    local_action: file path=/tmp/shardNodes state=absent
+  - name: Collect instances names
+    local_action: command sh -c 'echo sh.addShard\(\"{{ item.private_dns_name }}:27018\"\)\; >> /tmp/shardNodes'
+    with_items: ec2_shards.instances
+
+  - name: Create EC2 instances for MongoConfigs
+    ec2:
+      key_name: mongo
+      instance_type: c4.xlarge
+      image: ami-e7527ed7
+      region: us-west-2
+      wait: yes
+      group: ['SSH_access','default']
+      instance_tags:
+        MongoConfig: True
+      exact_count: 3
+      count_tag: MongoConfig
+      vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
+      assign_public_ip: yes
+      placement_group: mongo
+      volumes:
+        - device_name: /dev/xvdb
+          device_type: io1
+          iops: 1000
+          volume_size: 40
+          delete_on_termination: true
+        - device_name: /dev/xvdc
+          device_type: gp2
+          # iops: 1000
+          volume_size: 10
+          delete_on_termination: true
+        - device_name: /dev/xvdd
+          device_type: io1
+          iops: 1000
+          volume_size: 40
+          delete_on_termination: true
+      wait: yes
+      ebs_optimized: yes
+    register: ec2_config
+  - name: Add new instance to host group
+    add_host: hostname={{ item.public_ip }} groupname=mongo_configs ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
+    with_items: ec2_config.instances
+  - name: Wait for SSH to come up
+    wait_for: host={{ item.public_dns_name }} port=22 delay=5 timeout=320 state=started
+    with_items: ec2_config.instances
+  - name: Get rid of SSH "Are you sure you want to continue connecting (yes/no)?" query
+    local_action: command sh -c 'ssh-keyscan -t ECDSA {{ item.public_ip }} >> $HOME/.ssh/known_hosts'
+    with_items: ec2_config.instances
+  - name: Empty configNodes
+    local_action: file path=/tmp/configNodes state=absent
+  - name: Collect instances names
+    local_action: command sh -c 'echo {{ item.private_dns_name }}:27019, >> /tmp/configNodes'
+    with_items: ec2_config.instances
+
+  - name: Create EC2 instances for Mongos+PHP
+    ec2:
+      key_name: mongo
+      instance_type: c4.xlarge
+      image: ami-e7527ed7
+      region: us-west-2
+      wait: yes
+      group: ['SSH_access','default']
+      instance_tags:
+        PHP: True
+      exact_count: 6
+      count_tag: PHP
+      vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
+      assign_public_ip: yes
+      placement_group: mongo
+      volumes:
+        - device_name: /dev/xvdb
+          device_type: gp2
+          # iops: 1000
+          volume_size: 10
+          delete_on_termination: true
+      wait: yes
+      ebs_optimized: yes
+    register: ec2_php
+  - name: Add new instance to host group
+    add_host: hostname={{ item.public_ip }} groupname=php ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
+    with_items: ec2_php.instances
+  - name: Remember first mongos
+    add_host: hostname={{ ec2_php.instances[0].public_ip }} groupname=mongos_add_shards ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
+  - name: Wait for SSH to come up
+    wait_for: host={{ item.public_dns_name }} port=22 delay=5 timeout=320 state=started
+    with_items: ec2_php.instances
+  - name: Get rid of SSH "Are you sure you want to continue connecting (yes/no)?" query
+    local_action: command sh -c 'ssh-keyscan -t ECDSA {{ item.public_ip }} >> $HOME/.ssh/known_hosts'
+    with_items: ec2_php.instances
+
+
+
+
+- name: Configure All instance(s)
+  hosts: mongo_shards:mongo_configs:php
+  sudo: True
+  user: ec2-user
+  gather_facts: True
+  roles:
+    - common
+    - mongo_common
+
+- name: Configure Mongo instance(s)
+  hosts: mongo_shards:mongo_configs
+  sudo: True
+  user: ec2-user
+  gather_facts: True
+  roles:
+    - mongo_commonn_config_shard
+
+- name: Configure MongoShards instance(s)
+  hosts: mongo_shards
+  sudo: True
+  user: ec2-user
+  gather_facts: True
+  roles:
+    - mongo_shard
+
+- name: Configure MongoShards instance(s)
+  hosts: mongo_configs
+  sudo: True
+  user: ec2-user
+  gather_facts: True
+  roles:
+    - mongo_config
+
+- name: Configure PHP instance(s)
+  hosts: php
+  sudo: True
+  user: ec2-user
+  gather_facts: True
+  roles:
+    - php
+    - mongos
+
+- name: Add shards
+  hosts: mongos_add_shards
+  sudo: True
+  user: ec2-user
+  gather_facts: True
+  tasks:
+  - name: Copy list shards
+    copy: src=/tmp/shardNodes dest=/tmp/shardNodes
+  - name: Add shards
+    shell: mongo localhost /tmp/shardNodes
+

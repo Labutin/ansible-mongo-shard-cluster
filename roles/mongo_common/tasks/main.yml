@@ -1,0 +1,10 @@
+- name: Add yum mongo repo
+  copy: src=mongo.repo dest=/etc/yum.repos.d/mongo.repo
+- name: Install Mongo packages
+  yum: name=mongodb-org,mongodb-org-server,mongodb-org-shell,mongodb-org-mongos,mongodb-org-tools state=latest
+- name: Create dir for data
+  file: path=/data state=directory mode=0777
+- name: Create dir for logs
+  file: path=/logs state=directory mode=0777
+- name: Create dir for journal
+  file: path=/journal state=directory mode=0777

@@ -1,0 +1,23 @@
+- name: Create the mongos configuration file
+  copy: src=mongos.conf dest=/etc/mongos.conf
+- name: Copy config nodes list
+  copy: src=/tmp/configNodes dest=/tmp/configNodes
+- name: Prepare list config nodes
+  shell: tr -d '\n' < /tmp/configNodes | sed 's/,$//' >> /etc/mongos.conf
+- name: Create a ext4 filesystem on /dev/xvdb
+  filesystem: fstype=ext4 dev=/dev/xvdb
+- name: Mount logs
+  mount:
+    name: /logs
+    src: /dev/xvdb
+    fstype: ext4
+    state: mounted
+- name: Change owner to mongodb
+  file: path=/logs state=directory owner=mongod group=mongod
+- name: Copy init.d script
+  copy: src=mongos dest=/etc/init.d/mongos mode=0755
+- name: Disable mongod
+  service: name=mongod enabled=no
+- name: Starts mongos
+  service: name=mongos state=started enabled=yes
+

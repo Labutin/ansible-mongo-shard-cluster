@@ -1,0 +1,6 @@
+- name: Install PHP packages
+  yum: name=php-devel,php-pear,openssl-devel,gcc state=latest
+- name: Install MongoDB driver
+  shell: printf "\n" | pecl install mongo
+- name: Add PHP module
+  lineinfile: dest=/etc/php.d/mongo.ini line="extension=mongo.so" create=yes
