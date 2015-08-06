@@ -6,30 +6,30 @@
   filesystem: fstype=ext4 dev=/dev/xvdd
 - name: Mount data
   mount:
-    name: /data
+    name: /mdata
     src: /dev/xvdb
     fstype: ext4
     state: mounted
 - name: Mount logs
   mount:
-    name: /logs
+    name: /mlogs
     src: /dev/xvdc
     fstype: ext4
     state: mounted
 - name: Mount journal
   mount:
-    name: /journal
+    name: /mjournal
     src: /dev/xvdd
     fstype: ext4
     state: mounted
 - name: Change owner to mongodb
   file: path={{ item.path }} state=directory owner=mongod group=mongod
   with_items:
-    - { path: '/data' }
-    - { path: '/logs' }
-    - { path: '/journal' }
+    - { path: '/mdata' }
+    - { path: '/mlogs' }
+    - { path: '/mjournal' }
 - name: Make symlink to journal
-  file: src=/journal dest=/data/journal state=link owner=mongod group=mongod
+  file: src=/mjournal dest=/mdata/journal state=link owner=mongod group=mongod
 - name: Correct ulimits limits.conf
   lineinfile: dest=/etc/security/limits.conf line='{{ item.line }}'
   with_items:

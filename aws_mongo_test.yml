@@ -39,14 +39,14 @@
     ec2:
       key_name: mongo
       # instance_type: t2.micro
-      instance_type: c4.xlarge
-      image: ami-e7527ed7
+      instance_type: c3.2xlarge
+      image: ami-effab6df
       region: us-west-2
       wait: yes
       group: ['SSH_access','default']
       instance_tags:
         MongoShard: True
-      exact_count: 3
+      exact_count: 6
       count_tag: MongoShard
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
@@ -54,8 +54,8 @@
       volumes:
         - device_name: /dev/xvdb
           device_type: io1
-          iops: 2000
-          volume_size: 70
+          iops: 1000
+          volume_size: 100
           delete_on_termination: true
         - device_name: /dev/xvdc
           device_type: gp2
@@ -65,7 +65,7 @@
         - device_name: /dev/xvdd
           device_type: io1
           iops: 1000
-          volume_size: 40
+          volume_size: 70
           delete_on_termination: true
       wait: yes
       ebs_optimized: yes
@@ -153,7 +153,7 @@
         - device_name: /dev/xvdb
           device_type: gp2
           # iops: 1000
-          volume_size: 10
+          volume_size: 40
           delete_on_termination: true
       wait: yes
       ebs_optimized: yes

@@ -1,4 +1,7 @@
 - name: Copy MongoDB config
   copy: src=mongod.conf dest=/etc/mongod.conf
-- name: restart server
-  command: /sbin/reboot
+- name: restart machine
+  command: shutdown -r now "Ansible updates triggered"
+  async: 0
+  poll: 0
+  ignore_errors: true

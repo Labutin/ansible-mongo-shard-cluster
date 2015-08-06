@@ -8,16 +8,19 @@
   filesystem: fstype=ext4 dev=/dev/xvdb
 - name: Mount logs
   mount:
-    name: /logs
+    name: /mlogs
     src: /dev/xvdb
     fstype: ext4
     state: mounted
 - name: Change owner to mongodb
-  file: path=/logs state=directory owner=mongod group=mongod
+  file: path=/mlogs state=directory owner=mongod group=mongod
 - name: Copy init.d script
   copy: src=mongos dest=/etc/init.d/mongos mode=0755
 - name: Disable mongod
   service: name=mongod enabled=no
 - name: Starts mongos
   service: name=mongos state=started enabled=yes
+- name: Debug
+  debug: var=ec2_config
+  
 
