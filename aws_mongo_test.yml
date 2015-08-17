@@ -59,7 +59,7 @@
       count_tag: MongoShard
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
-      placement_group: mongo
+      # placement_group: mongo
       volumes:
         - device_name: /dev/xvdb
           device_type: gp2
@@ -108,7 +108,7 @@
       count_tag: MongoConfig
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
-      placement_group: mongo
+      # placement_group: mongo
       volumes:
         - device_name: /dev/xvdb
           device_type: gp2
@@ -157,7 +157,7 @@
       count_tag: PHP
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
-      placement_group: mongo
+      # placement_group: mongo
       volumes:
         - device_name: /dev/xvdb
           device_type: gp2
