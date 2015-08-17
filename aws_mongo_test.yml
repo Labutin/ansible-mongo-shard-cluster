@@ -1,6 +1,16 @@
 ---
 - name: Mongo test environment
   hosts: localhost
+  vars:
+    MongoShardInstanceType: t2.micro
+    # MongoShardInstanceType: c3.2xlarge
+    MongoShardInstanceCount: 3
+    MongoConfigInstanceType: t2.micro
+    # MongoConfigInstanceType: c4.xlarge
+    MongoConfigInstanceCount: 3
+    PHPInstanceType: t2.micro
+    # PHPInstanceType: c4.xlarge
+    PHPInstanceCount: 1
   gather_facts: False
   tasks:
   - name: Create Mongo VPC
@@ -38,23 +48,22 @@
   - name: Create EC2 instances for MongoShards
     ec2:
       key_name: mongo
-      # instance_type: t2.micro
-      instance_type: c3.2xlarge
-      image: ami-effab6df
+      instance_type: "{{ MongoShardInstanceType }}"
+      image: ami-e7527ed7
       region: us-west-2
       wait: yes
       group: ['SSH_access','default']
       instance_tags:
         MongoShard: True
-      exact_count: 6
+      exact_count: "{{ MongoShardInstanceCount }}"
       count_tag: MongoShard
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
       placement_group: mongo
       volumes:
         - device_name: /dev/xvdb
-          device_type: io1
-          iops: 1000
+          device_type: gp2
+          # iops: 1000
           volume_size: 100
           delete_on_termination: true
         - device_name: /dev/xvdc
@@ -63,12 +72,12 @@
           volume_size: 10
           delete_on_termination: true
         - device_name: /dev/xvdd
-          device_type: io1
-          iops: 1000
+          device_type: gp2
+          # iops: 1000
           volume_size: 70
           delete_on_termination: true
       wait: yes
-      ebs_optimized: yes
+      # ebs_optimized: yes
     register: ec2_shards
   - name: Add new instance to host group
     add_host: hostname={{ item.public_ip }} groupname=mongo_shards ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
@@ -88,22 +97,22 @@
   - name: Create EC2 instances for MongoConfigs
     ec2:
       key_name: mongo
-      instance_type: c4.xlarge
+      instance_type: "{{ MongoConfigInstanceType }}"
       image: ami-e7527ed7
       region: us-west-2
       wait: yes
       group: ['SSH_access','default']
       instance_tags:
         MongoConfig: True
-      exact_count: 3
+      exact_count: "{{ MongoConfigInstanceCount }}"
       count_tag: MongoConfig
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
       placement_group: mongo
       volumes:
         - device_name: /dev/xvdb
-          device_type: io1
-          iops: 1000
+          device_type: gp2
+          # iops: 1000
           volume_size: 40
           delete_on_termination: true
         - device_name: /dev/xvdc
@@ -112,12 +121,12 @@
           volume_size: 10
           delete_on_termination: true
         - device_name: /dev/xvdd
-          device_type: io1
-          iops: 1000
+          device_type: gp2
+          # iops: 1000
           volume_size: 40
           delete_on_termination: true
       wait: yes
-      ebs_optimized: yes
+      # ebs_optimized: yes
     register: ec2_config
   - name: Add new instance to host group
     add_host: hostname={{ item.public_ip }} groupname=mongo_configs ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
@@ -137,14 +146,14 @@
   - name: Create EC2 instances for Mongos+PHP
     ec2:
       key_name: mongo
-      instance_type: c4.xlarge
+      instance_type: "{{ PHPInstanceType }}"
       image: ami-e7527ed7
       region: us-west-2
       wait: yes
       group: ['SSH_access','default']
       instance_tags:
         PHP: True
-      exact_count: 6
+      exact_count: "{{ PHPInstanceCount }}"
       count_tag: PHP
       vpc_subnet_id: "{{ ec2_vpc1.subnets[0].id }}"
       assign_public_ip: yes
@@ -156,7 +165,7 @@
           volume_size: 40
           delete_on_termination: true
       wait: yes
-      ebs_optimized: yes
+      # ebs_optimized: yes
     register: ec2_php
   - name: Add new instance to host group
     add_host: hostname={{ item.public_ip }} groupname=php ansible_ssh_private_key_file=~/.ssh/mongo.pem.txt
